@@ -13,6 +13,8 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.descriptions import ParameterFile
+from nav2_common.launch import RewrittenYaml
 
 
 def launch_setup(context, *args, **kwargs):
@@ -67,12 +69,28 @@ def launch_setup(context, *args, **kwargs):
     autostart = LaunchConfiguration('autostart')
     rviz = LaunchConfiguration('rviz')
 
+    configured_params = ParameterFile(
+        RewrittenYaml(
+            source_file=params_file_value,
+            root_key='',
+            param_rewrites={
+                'use_sim_time': use_sim_time,
+                'autostart': autostart,
+                'yaml_filename': map_yaml_file,
+                'graph_filepath': route_graph,
+                'default_nav_to_pose_bt_xml': nav2pose_bt_xml_value,
+            },
+            convert_types=True,
+        ),
+        allow_substs=True,
+    )
+
     bringup_cmd_group = GroupAction([
         Node(
             name=container_name,
             package='rclcpp_components',
             executable='component_container_isolated',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[configured_params],
             arguments=['--ros-args', '--log-level', 'info'],
             output='screen',
         ),
