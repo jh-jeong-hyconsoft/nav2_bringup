@@ -3,7 +3,7 @@ bt_navigator:
     use_sim_time: false
     global_frame: map
     robot_base_frame: base_link
-    odom_topic: /odom
+    odom_topic: /dlio/odom_node/odom
     bt_loop_duration: 10
     default_server_timeout: 20
     wait_for_service_timeout: 1000
@@ -35,7 +35,7 @@ bt_navigator_navigate_to_pose_rclcpp_node:
 controller_server:
   ros__parameters:
     use_sim_time: false
-    controller_frequency: 30.0
+    controller_frequency: 20.0
     min_x_velocity_threshold: 0.05
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.01
@@ -73,9 +73,9 @@ controller_server:
 
     FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
-      time_steps: 56
+      time_steps: 30
       model_dt: 0.05
-      batch_size: 2000
+      batch_size: 700
       vx_std: 0.2
       vy_std: 0.0
       wz_std: 0.4
@@ -89,7 +89,7 @@ controller_server:
       az_max: 3.5
       iteration_count: 1
       prune_distance: 1.7
-      transform_tolerance: 0.2
+      transform_tolerance: 0.5
       temperature: 0.3
       gamma: 0.015
       motion_model: "DiffDrive"
@@ -141,7 +141,7 @@ controller_server:
         cost_power: 1
         cost_weight: 3.81
         critical_cost: 300.0
-        consider_footprint: false
+        consider_footprint: true
         collision_cost: 1000000.0
         near_goal_distance: 1.0
         trajectory_point_step: 2
@@ -176,45 +176,58 @@ local_costmap:
   local_costmap:
     ros__parameters:
       use_sim_time: false
-      update_frequency: 5.0
-      publish_frequency: 2.0
+      update_frequency: 10.0
+      publish_frequency: 3.0
       global_frame: odom
       robot_base_frame: base_link
       rolling_window: true
-      width: 4
-      height: 4
+      width: 6
+      height: 6
       resolution: 0.05
-      footprint: "[ [0.47, 0.35], [0.47, -0.35], [-0.47, -0.35], [-0.47, 0.35] ]"
-      footprint_padding: 0.05
-      plugins: ["voxel_layer", "inflation_layer"]
+      transform_tolerance: 0.5
+      footprint: "[[0.50, 0.40], [0.50, -0.40], [-0.50, -0.40], [-0.50, 0.40]]"
+      footprint_padding: 0.10
 
-      voxel_layer:
-        plugin: "nav2_costmap_2d::VoxelLayer"
+      plugins: ["obstacle_layer", "inflation_layer"]
+
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
-        publish_voxel_map: false
         footprint_clearing_enabled: true
-        origin_z: 0.0
-        z_resolution: 0.05
-        z_voxels: 16
-        max_obstacle_height: 2.0
-        mark_threshold: 0
-        observation_sources: scan
+        observation_sources: "scan nonground"
+
         scan:
-          topic: /ouster/scan
+          topic: /scan
+          data_type: "LaserScan"
+          marking: true
+          clearing: true
+          obstacle_min_range: 0.0
+          obstacle_max_range: 5.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 6.0
+          min_obstacle_height: 0.05
+          max_obstacle_height: 2.0
+          observation_persistence: 0.0
+          expected_update_rate: 0.0
+
+        nonground:
+          topic: /patchworkpp/nonground
+          data_type: "PointCloud2"
+          marking: true
+          clearing: false
+          obstacle_min_range: 0.15
+          obstacle_max_range: 5.0
+          raytrace_min_range: 0.0
+          raytrace_max_range: 5.0
           min_obstacle_height: 0.05
           max_obstacle_height: 1.5
-          clearing: true
-          marking: true
-          data_type: "LaserScan"
-          raytrace_max_range: 5.0
-          raytrace_min_range: 0.0
-          obstacle_max_range: 4.0
-          obstacle_min_range: 0.15
+          observation_persistence: 0.2
+          expected_update_rate: 0.0
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
         inflation_radius: 0.75
+        cost_scaling_factor: 3.0
 
       always_send_full_costmap: true
 
@@ -223,13 +236,15 @@ global_costmap:
     ros__parameters:
       use_sim_time: false
       update_frequency: 1.0
-      publish_frequency: 1.0
+      publish_frequency: 0.2
       global_frame: map
       robot_base_frame: base_link
-      resolution: 0.05
-      footprint: "[ [0.47, 0.35], [0.47, -0.35], [-0.47, -0.35], [-0.47, 0.35] ]"
-      footprint_padding: 0.05
+      resolution: 0.10
+      transform_tolerance: 0.5
+      footprint: "[[0.50, 0.40], [0.50, -0.40], [-0.50, -0.40], [-0.50, 0.40]]"
+      footprint_padding: 0.10
       track_unknown_space: true
+
       plugins: ["static_layer", "voxel_layer", "inflation_layer"]
 
       static_layer:
@@ -246,25 +261,28 @@ global_costmap:
         z_voxels: 16
         max_obstacle_height: 2.0
         mark_threshold: 0
-        observation_sources: scan
+        observation_sources: "scan"
+
         scan:
-          topic: /ouster/scan
-          min_obstacle_height: 0.05
-          max_obstacle_height: 1.5
-          clearing: true
-          marking: true
+          topic: /scan
           data_type: "LaserScan"
-          raytrace_max_range: 10.0
+          marking: true
+          clearing: true
+          obstacle_min_range: 0.0
+          obstacle_max_range: 6.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 8.0
-          obstacle_min_range: 0.15
+          raytrace_max_range: 7.0
+          min_obstacle_height: 0.05
+          max_obstacle_height: 2.0
+          observation_persistence: 0.0
+          expected_update_rate: 0.0
 
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
         inflation_radius: 0.75
 
-      always_send_full_costmap: true
+      always_send_full_costmap: false
 
 map_server:
   ros__parameters:
@@ -343,7 +361,7 @@ behavior_server:
 
     global_frame: odom
     robot_base_frame: base_link
-    transform_tolerance: 0.2
+    transform_tolerance: 0.5
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4
@@ -359,7 +377,7 @@ velocity_smoother:
     min_velocity: [-0.35, 0.0, -1.9]
     max_accel: [3.0, 0.0, 3.5]
     max_decel: [-3.0, 0.0, -3.5]
-    odom_topic: /odom
+    odom_topic: /dlio/odom_node/odom
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0
@@ -374,9 +392,9 @@ collision_monitor:
     cmd_vel_out_topic: cmd_vel
     state_topic: collision_monitor_state
 
-    transform_tolerance: 0.2
+    transform_tolerance: 0.5
     source_timeout: 1.0
-    base_shift_correction: false
+    base_shift_correction: true
     stop_pub_timeout: 1.0
 
     polygons: ["FootprintApproach", "FrontStop"]
@@ -385,26 +403,29 @@ collision_monitor:
       type: "polygon"
       action_type: "approach"
       footprint_topic: local_costmap/published_footprint
-      time_before_collision: 1.5
+      time_before_collision: 1.0
       simulation_time_step: 0.1
-      max_points: 6
+      max_points: 4
       visualize: false
       enabled: true
 
     FrontStop:
       type: "polygon"
-      points: [0.80, 0.40, 0.80, -0.40, 0.20, -0.40, 0.20, 0.40]
+      points: [1.10, 0.38, 1.10, -0.38, 0.60, -0.38, 0.60, 0.38]
       action_type: "stop"
-      max_points: 4
+      max_points: 3
       visualize: true
       polygon_pub_topic: front_stop_polygon
       enabled: true
 
-    observation_sources: ["scan"]
+    observation_sources: ["nonground"]
 
-    scan:
-      type: "scan"
-      topic: /ouster/scan
+    nonground:
+      type: "pointcloud"
+      topic: /patchworkpp/nonground
+      transport_type: "raw"
       min_height: 0.05
       max_height: 1.5
+      min_range: 0.15
+      source_timeout: 1.0
       enabled: true
