@@ -60,6 +60,9 @@ def behavior_server(configured_params):
         plugin='behavior_server::BehaviorServer',
         name='behavior_server',
         parameters=[configured_params],
+        remappings=[
+            ('cmd_vel', 'cmd_vel_nav'),
+        ],
     )
 
 
@@ -167,10 +170,11 @@ def local_lifecycle_node_names(use_collision_monitor):
 
 def urban_navigation_nodes(configured_params, use_collision_monitor):
     # Urban profile follows the OpenNav AMD 3D route-demo direction:
-    # no BT navigator, no planner server, no behavior server, no map server.
-    # gps_executor is expected to call route_server and then FollowPath.
+    # no BT navigator, no planner server, no map server.
+    # route_navigation_executor calls route_server, Spin, and then FollowPath.
     nodes = [
         controller_server(configured_params),
+        behavior_server(configured_params),
         velocity_smoother(configured_params, use_collision_monitor),
         route_server(configured_params),
     ]
@@ -184,6 +188,7 @@ def urban_navigation_nodes(configured_params, use_collision_monitor):
 def urban_lifecycle_node_names(use_collision_monitor):
     node_names = [
         'controller_server',
+        'behavior_server',
         'velocity_smoother',
         'route_server',
     ]
@@ -265,6 +270,7 @@ def generate_launch_description():
         'use_sim_time': use_sim_time,
         'autostart': autostart,
         'yaml_filename': map_yaml_file,
+        'graph_filepath': route_graph,
         'default_nav_to_pose_bt_xml': nav2pose_bt_xml,
     }
 

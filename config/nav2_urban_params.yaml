@@ -165,6 +165,29 @@ local_costmap:
         inflation_radius: 0.75
         cost_scaling_factor: 3.0
 
+behavior_server:
+  ros__parameters:
+    use_sim_time: false
+
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+
+    cycle_frequency: 10.0
+
+    global_frame: odom
+    robot_base_frame: base_link
+    transform_tolerance: 0.5
+
+    behavior_plugins: ["spin"]
+
+    spin:
+      plugin: "nav2_behaviors/Spin"
+
+    simulate_ahead_time: 1.0
+    max_rotational_vel: 0.5
+    min_rotational_vel: 0.15
+    rotational_acc_lim: 1.5
+
 velocity_smoother:
   ros__parameters:
     use_sim_time: false
