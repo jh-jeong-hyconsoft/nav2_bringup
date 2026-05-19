@@ -41,16 +41,12 @@ def launch_setup(context, *args, **kwargs):
             f'nav2_{environment_value}_params.yaml',
         )
 
-    if not nav2pose_bt_xml_value:
-        bt_filename = (
-            'urban_navigate_to_pose.xml'
-            if environment_value == 'urban'
-            else 'local_navigate_to_pose.xml'
-        )
+    # BT XML is used only in the local profile. Urban does not load bt_navigator.
+    if not nav2pose_bt_xml_value and environment_value == 'local':
         nav2pose_bt_xml_value = os.path.join(
             pkg_dir,
             'behavior_trees',
-            bt_filename,
+            'local_navigate_to_pose.xml',
         )
 
     if not rviz_config_value:
@@ -172,7 +168,7 @@ def generate_launch_description():
     declare_nav2pose_bt_xml_cmd = DeclareLaunchArgument(
         'nav2pose_bt_xml',
         default_value='',
-        description='Optional Behavior Tree XML used by NavigateToPose.',
+        description='Optional Behavior Tree XML used only by local profile.',
     )
 
     declare_container_name_cmd = DeclareLaunchArgument(

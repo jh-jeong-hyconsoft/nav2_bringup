@@ -83,6 +83,9 @@ def map_server(configured_params):
 
 def velocity_smoother(configured_params, use_collision_monitor):
     remappings = [('cmd_vel', 'cmd_vel_nav')]
+
+    # When collision monitor is disabled, velocity_smoother becomes the final
+    # publisher to the robot base command topic.
     if not use_collision_monitor:
         remappings.append(('cmd_vel_smoothed', 'cmd_vel'))
 
@@ -126,13 +129,11 @@ def lifecycle_manager(name, use_sim_time, autostart, node_names):
     )
 
 
-def navigation_nodes(
-    configured_params,
-    use_collision_monitor,
-    include_map,
-    include_route,
-):
+def local_navigation_nodes(configured_params, use_collision_monitor):
+    # Local profile keeps the conventional Nav2 NavigateToPose stack.
+    # Route server is intentionally not loaded in local mode.
     nodes = [
+        map_server(configured_params),
         controller_server(configured_params),
         planner_server(configured_params),
         smoother_server(configured_params),
@@ -141,20 +142,15 @@ def navigation_nodes(
         velocity_smoother(configured_params, use_collision_monitor),
     ]
 
-    if include_map:
-        nodes.insert(0, map_server(configured_params))
-
     if use_collision_monitor:
         nodes.append(collision_monitor(configured_params))
-
-    if include_route:
-        nodes.append(route_server(configured_params))
 
     return nodes
 
 
-def lifecycle_node_names(use_collision_monitor, include_map, include_route):
+def local_lifecycle_node_names(use_collision_monitor):
     node_names = [
+        'map_server',
         'controller_server',
         'planner_server',
         'smoother_server',
@@ -163,19 +159,42 @@ def lifecycle_node_names(use_collision_monitor, include_map, include_route):
         'velocity_smoother',
     ]
 
-    if include_map:
-        node_names.insert(0, 'map_server')
-
     if use_collision_monitor:
         node_names.append('collision_monitor')
-
-    if include_route:
-        node_names.append('route_server')
 
     return node_names
 
 
-def navigation_bundle(
+def urban_navigation_nodes(configured_params, use_collision_monitor):
+    # Urban profile follows the OpenNav AMD 3D route-demo direction:
+    # no BT navigator, no planner server, no behavior server, no map server.
+    # gps_executor is expected to call route_server and then FollowPath.
+    nodes = [
+        controller_server(configured_params),
+        velocity_smoother(configured_params, use_collision_monitor),
+        route_server(configured_params),
+    ]
+
+    if use_collision_monitor:
+        nodes.append(collision_monitor(configured_params))
+
+    return nodes
+
+
+def urban_lifecycle_node_names(use_collision_monitor):
+    node_names = [
+        'controller_server',
+        'velocity_smoother',
+        'route_server',
+    ]
+
+    if use_collision_monitor:
+        node_names.append('collision_monitor')
+
+    return node_names
+
+
+def local_navigation_bundle(
     *,
     target_container,
     condition,
@@ -184,22 +203,42 @@ def navigation_bundle(
     autostart,
     lifecycle_name,
     use_collision_monitor,
-    include_map,
-    include_route,
 ):
-    node_names = lifecycle_node_names(
-        use_collision_monitor,
-        include_map,
-        include_route,
-    )
-    nodes = navigation_nodes(
-        configured_params,
-        use_collision_monitor,
-        include_map,
-        include_route,
-    )
+    nodes = local_navigation_nodes(configured_params, use_collision_monitor)
     nodes.append(
-        lifecycle_manager(lifecycle_name, use_sim_time, autostart, node_names)
+        lifecycle_manager(
+            lifecycle_name,
+            use_sim_time,
+            autostart,
+            local_lifecycle_node_names(use_collision_monitor),
+        )
+    )
+
+    return LoadComposableNodes(
+        target_container=target_container,
+        condition=IfCondition(condition),
+        composable_node_descriptions=nodes,
+    )
+
+
+def urban_navigation_bundle(
+    *,
+    target_container,
+    condition,
+    configured_params,
+    use_sim_time,
+    autostart,
+    lifecycle_name,
+    use_collision_monitor,
+):
+    nodes = urban_navigation_nodes(configured_params, use_collision_monitor)
+    nodes.append(
+        lifecycle_manager(
+            lifecycle_name,
+            use_sim_time,
+            autostart,
+            urban_lifecycle_node_names(use_collision_monitor),
+        )
     )
 
     return LoadComposableNodes(
@@ -294,7 +333,7 @@ def generate_launch_description():
             'behavior_trees',
             'local_navigate_to_pose.xml',
         ),
-        description='Behavior Tree XML used by NavigateToPose.',
+        description='Behavior Tree XML used only by the local profile.',
     )
 
     declare_autostart_cmd = DeclareLaunchArgument(
@@ -303,7 +342,7 @@ def generate_launch_description():
         description='Automatically transition lifecycle nodes to active.',
     )
 
-    local_with_collision = navigation_bundle(
+    local_with_collision = local_navigation_bundle(
         target_container=container_name,
         condition=profile_with_collision(
             environment,
@@ -315,11 +354,9 @@ def generate_launch_description():
         autostart=autostart,
         lifecycle_name='lifecycle_manager_local_navigation',
         use_collision_monitor=True,
-        include_map=True,
-        include_route=False,
     )
 
-    local_without_collision = navigation_bundle(
+    local_without_collision = local_navigation_bundle(
         target_container=container_name,
         condition=profile_without_collision(
             environment,
@@ -331,11 +368,9 @@ def generate_launch_description():
         autostart=autostart,
         lifecycle_name='lifecycle_manager_local_navigation',
         use_collision_monitor=False,
-        include_map=True,
-        include_route=False,
     )
 
-    urban_with_collision = navigation_bundle(
+    urban_with_collision = urban_navigation_bundle(
         target_container=container_name,
         condition=profile_with_collision(
             environment,
@@ -347,11 +382,9 @@ def generate_launch_description():
         autostart=autostart,
         lifecycle_name='lifecycle_manager_urban_navigation',
         use_collision_monitor=True,
-        include_map=False,
-        include_route=True,
     )
 
-    urban_without_collision = navigation_bundle(
+    urban_without_collision = urban_navigation_bundle(
         target_container=container_name,
         condition=profile_without_collision(
             environment,
@@ -363,8 +396,6 @@ def generate_launch_description():
         autostart=autostart,
         lifecycle_name='lifecycle_manager_urban_navigation',
         use_collision_monitor=False,
-        include_map=False,
-        include_route=True,
     )
 
     ld = LaunchDescription()
