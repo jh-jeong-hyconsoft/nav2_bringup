@@ -265,7 +265,6 @@ def generate_launch_description():
         'use_sim_time': use_sim_time,
         'autostart': autostart,
         'yaml_filename': map_yaml_file,
-        'graph_filepath': route_graph,
         'default_nav_to_pose_bt_xml': nav2pose_bt_xml,
     }
 
